@@ -48,3 +48,43 @@ test_data = data.skip(round(len(data) * .7))
 test_data = test_data.take(round(len(data) * .3))
 test_data = test_data.batch(16)
 test_data = test_data.prefetch(8)
+
+def make_embedding():
+    input = Input(shape=(100, 100, 3), name='input_image')
+
+    x = Conv2D(64, (10,10), activation='relu')(input)
+    x = MaxPooling2D(64, (2,2), padding='same')(x)
+
+    x = Conv2D(128, (7,7), activation='relu')(x)
+    x = MaxPooling2D(64, (2,2), padding='same')(x)
+
+    x = Conv2D(128, (4,4), activation='relu')(x)
+    x = MaxPooling2D(64, (2,2), padding='same')(x)
+
+    x = Conv2D(256, (4,4), activation='relu')(x)
+    x = Flatten()(x)
+
+    x = Dense(4096, activation='sigmoid')(x)
+
+    return Model(inputs=[input], outputs=[x], name='embedding')
+
+class L1Dist(Layer):
+    def __init__(self, **kwargs):
+        super().__init__()
+
+    def call(self, input_embedding, validation_embedding):
+        return tf.math.abs(input_embedding - validation_embedding)
+
+def make_siamese_model():
+    input_image = Input(name='input_img', shape=(100, 100, 3))
+    validation_image = Input(name='validation_img', shape=(100, 100, 3))
+
+    embedding = make_embedding()
+
+    siamese_layer = L1Dist()
+    siamese_layer._name = 'distance'
+    distances = siamese_layer(embedding(input_image), embedding(validation_image))
+
+    classifier = Dense(1, activation='sigmoid')(distances)
+
+    return Model(inputs=[input_image, validation_image], outputs=classifier, name='SiameseNetwork')
