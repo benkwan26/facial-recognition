@@ -8,6 +8,8 @@ import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Layer, Conv2D, Dense, MaxPooling2D, Input, Flatten
 
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+
 gpus = tf.config.experimental.list_physical_devices('GPU')
 for gpu in gpus:
     tf.config.experimental.set_memory_growth(gpu, True)
@@ -73,7 +75,7 @@ class L1Dist(Layer):
         super().__init__()
 
     def call(self, input_embedding, validation_embedding):
-        return tf.math.abs(input_embedding - validation_embedding)
+        return tf.math.abs(input_embedding[0] - validation_embedding[0])
 
 def make_siamese_model():
     input_image = Input(name='input_img', shape=(100, 100, 3))
@@ -88,3 +90,38 @@ def make_siamese_model():
     classifier = Dense(1, activation='sigmoid')(distances)
 
     return Model(inputs=[input_image, validation_image], outputs=classifier, name='SiameseNetwork')
+
+siamese_model = make_siamese_model()
+
+binary_cross_loss = tf.losses.BinaryCrossentropy()
+optimizer = tf.keras.optimizers.Adam(1e-4)
+
+checkpoint_dir = './training_checkpoints'
+checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
+checkpoint = tf.train.Checkpoint(optimizer=optimizer, siamese_model=siamese_model)
+
+@tf.function
+def train_step(batch):
+    with tf.GradientTape() as tape:
+        X = batch[:2]
+        y = batch[2]
+
+        y_hat = siamese_model(X, training=True)
+        loss = binary_cross_loss(y, y_hat)
+
+    grad = tape.gradient(loss, siamese_model.trainable_variables)
+    optimizer.apply_gradients(zip(grad, siamese_model.trainable_variables))
+
+    return loss
+
+def train(data, epochs):
+    for epoch in range(1, epochs + 1):
+        for _, batch in enumerate(data):
+            loss = train_step(batch)
+
+        if epoch % 10 == 0:
+            print(f'Epoch {epoch}/{epochs} | Loss: {loss.numpy():.4f}')
+            checkpoint.save(file_prefix=checkpoint_prefix)
+
+if __name__ == '__main__':
+    train(train_data, epochs=50)
