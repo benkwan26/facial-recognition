@@ -7,6 +7,7 @@ from matplotlib import pyplot as plt
 import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Layer, Conv2D, Dense, MaxPooling2D, Input, Flatten
+from tensorflow.keras.metrics import Precision, Recall
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
@@ -123,5 +124,26 @@ def train(data, epochs):
             print(f'Epoch {epoch}/{epochs} | Loss: {loss.numpy():.4f}')
             checkpoint.save(file_prefix=checkpoint_prefix)
 
-if __name__ == '__main__':
-    train(train_data, epochs=50)
+train(train_data, epochs=50)
+
+test_input, test_val, y_true = test_data.as_numpy_iterator().next()
+y_hat = siamese_model.predict([test_input, test_val])
+y_hat = [1 if y > 0.5 else 0 for y in y_hat]
+print(y_hat)
+
+m = Recall()
+m.update_state(y_true, y_hat)
+m.result().numpy()
+
+plt.figure(figsize=(18, 8))
+plt.subplot(1, 2, 1)
+plt.imshow(test_input[0])
+plt.subplot(1, 2, 2)
+plt.imshow(test_val[0])
+plt.show()
+
+siamese_model.save('siamese_model.h5')
+
+model = tf.keras.models.load_model('siamese_model.h5', custom_objects={'L1Dist': L1Dist, 'BinaryCrossentropy': tf.losses.BinaryCrossentropy})
+
+# if __name__ == '__main__':
