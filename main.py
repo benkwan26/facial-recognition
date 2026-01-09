@@ -126,14 +126,15 @@ def train(data, epochs):
 
 train(train_data, epochs=50)
 
-test_input, test_val, y_true = test_data.as_numpy_iterator().next()
-y_hat = siamese_model.predict([test_input, test_val])
-y_hat = [1 if y > 0.5 else 0 for y in y_hat]
-print(y_hat)
+r = Recall()
+p = Precision()
 
-m = Recall()
-m.update_state(y_true, y_hat)
-m.result().numpy()
+for test_input, test_val, y_true in test_data.as_numpy_iterator():
+    y_hat = siamese_model.predict([test_input, test_val])
+    r.update_state(y_true, y_hat)
+    p.update_state(y_true, y_hat)
+
+print(r.result().numpy(), p.result().numpy())
 
 plt.figure(figsize=(18, 8))
 plt.subplot(1, 2, 1)
@@ -144,6 +145,4 @@ plt.show()
 
 siamese_model.save('siamese_model.h5')
 
-model = tf.keras.models.load_model('siamese_model.h5', custom_objects={'L1Dist': L1Dist, 'BinaryCrossentropy': tf.losses.BinaryCrossentropy})
-
-# if __name__ == '__main__':
+# model = tf.keras.models.load_model('siamese_model.h5', custom_objects={'L1Dist': L1Dist, 'BinaryCrossentropy': tf.losses.BinaryCrossentropy})
