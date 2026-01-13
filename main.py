@@ -1,13 +1,11 @@
-import cv2
 import os
-import random
-import numpy as np
 from matplotlib import pyplot as plt
 
 import tensorflow as tf
-from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Layer, Conv2D, Dense, MaxPooling2D, Input, Flatten
-from tensorflow.keras.metrics import Precision, Recall
+import keras
+from keras.models import Model
+from keras.layers import Layer, Conv2D, Dense, MaxPooling2D, Input, Flatten
+from keras.metrics import Precision, Recall
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
@@ -52,6 +50,7 @@ test_data = test_data.take(round(len(data) * .3))
 test_data = test_data.batch(16)
 test_data = test_data.prefetch(8)
 
+@keras.saving.register_keras_serializable()
 def make_embedding():
     input = Input(shape=(100, 100, 3), name='input_image')
 
@@ -71,12 +70,13 @@ def make_embedding():
 
     return Model(inputs=[input], outputs=[x], name='embedding')
 
+@keras.saving.register_keras_serializable()
 class L1Dist(Layer):
-    def __init__(self, **kwargs):
-        super().__init__()
-
     def call(self, input_embedding, validation_embedding):
-        return tf.math.abs(input_embedding[0] - validation_embedding[0])
+        return keras.ops.abs(input_embedding[0] - validation_embedding[0])
+
+    def get_config(self):
+        return super().get_config()
 
 def make_siamese_model():
     input_image = Input(name='input_img', shape=(100, 100, 3))
@@ -143,6 +143,4 @@ plt.subplot(1, 2, 2)
 plt.imshow(test_val[0])
 plt.show()
 
-siamese_model.save('siamese_model.h5')
-
-# model = tf.keras.models.load_model('siamese_model.h5', custom_objects={'L1Dist': L1Dist, 'BinaryCrossentropy': tf.losses.BinaryCrossentropy})
+siamese_model.save('models/siamese_model.keras')
